@@ -22,6 +22,19 @@ var (
 	COMMIT_ID     string
 )
 
+func githubClient(token string) (*github.Client, error) {
+	var client *github.Client
+	var err error
+	client = github.NewClient(nil).WithAuthToken(token)
+	if githubactions.GetInput("github-api-url") != "" {
+		client, err = github.NewClient(nil).WithAuthToken(token).WithEnterpriseURLs(githubactions.GetInput("github-api-url"), "")
+		if err != nil {
+			return nil, err
+		}
+	}
+	return client, nil
+}
+
 func generateTraceID(runID int64, runAttempt int) string {
 	input := fmt.Sprintf("%d%dt", runID, runAttempt)
 	hash := sha256.Sum256([]byte(input))
@@ -45,7 +58,10 @@ func getGitHubJobInfo(ctx context.Context, token, owner, repo string, runID, att
 	}
 	owner, repo = splitRepo[0], splitRepo[1]
 
-	client := github.NewClient(nil).WithAuthToken(token)
+	client, err := githubClient(token)
+	if err != nil {
+		return "", "", "", "", fmt.Errorf("failed to create GitHub client: %v", err)
+	}
 	opts := &github.ListWorkflowJobsOptions{
 		ListOptions: github.ListOptions{PerPage: 100},
 	}
